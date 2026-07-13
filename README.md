@@ -38,3 +38,10 @@ Alle knoppen staan bovenaan `score_trainings.py`:
 - **`VERDICT_BANDS`** — grenzen van de verdict-banden.
 - **`USE_WEB_SEARCH`** — Toggle Web Search
 - **`RUBRIC_CUT`** — '**RUBRIC_CUT - 1**' is hoeveel secties van de rubric meegestuurd worden
+
+## Definities scoringsdimensies
+
+- **`Kernhelderheid`** — Is het onderwerp en de waarde van de training helder genoeg om Korte/Algemene/Kortste omschrijving op te bouwen?
+- **`Programma-substantie`** — Bevatten de modules echte, beschrijfbare, niet-overlappende inhoud die een compleet programma vormt voor het aantal dagen, passend voor het niveau van de training?
+- **`Leeruitkomst-oriëntatie`** — Verwoordt de bron wat de deelnemer met de kennis kan (uitkomsten), of is het vooral achtergrond over de tool ("wat is X, opgericht in jaar Y, hoe werkt het")?
+- **`Ondersteunende secties`** — Zijn Doelgroep, Voorkennis en Doelen aanwezig of schoon af te leiden? 
