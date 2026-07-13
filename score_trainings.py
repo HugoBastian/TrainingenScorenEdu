@@ -33,7 +33,7 @@ from typing import Any
 
 MODEL = "claude-sonnet-5"          # kalibreren op Sonnet; later evt. Opus
 MAX_TOKENS = 8000
-USE_WEB_SEARCH = True              # actualiteitscheck; zet uit om sneller/goedkoper te testen
+USE_WEB_SEARCH = False              # actualiteitscheck; zet uit om sneller/goedkoper te testen
 WEB_SEARCH_MAX_USES = 2            # zoekopdrachten per training
 RUBRIC_CUT = 8                     # RUBRIC_CUT - 1 is hoeveel secties van de rubric meegestuurd worden
 
