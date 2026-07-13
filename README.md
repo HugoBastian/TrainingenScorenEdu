@@ -37,4 +37,4 @@ Alle knoppen staan bovenaan `score_trainings.py`:
 - **`STRUCTUREEL_CAP`** — structurele breuk capt de eindscore (nu ≤40) en zet de mens-vlag.
 - **`VERDICT_BANDS`** — grenzen van de verdict-banden.
 - **`USE_WEB_SEARCH`** — Toggle Web Search
-- **`RUBRIC_CUT`** — **RUBRIC_CUT - 1** is hoeveel secties van de rubric meegestuurd worden
+- **`RUBRIC_CUT`** — '**RUBRIC_CUT - 1**' is hoeveel secties van de rubric meegestuurd worden
