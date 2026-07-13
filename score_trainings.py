@@ -32,9 +32,10 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 MODEL = "claude-sonnet-5"          # kalibreren op Sonnet; later evt. Opus
-MAX_TOKENS = 4000
+MAX_TOKENS = 8000
 USE_WEB_SEARCH = True              # actualiteitscheck; zet uit om sneller/goedkoper te testen
 WEB_SEARCH_MAX_USES = 3            # zoekopdrachten per training
+RUBRIC_CUT = 8                     # RUBRIC_CUT - 1 is hoeveel secties van de rubric meegestuurd worden
 
 # Dimensiegewichten (rubric §3). Som = 1.0
 WEIGHTS = {
@@ -171,6 +172,23 @@ def verdict_for(score: float) -> str:
     return "onbruikbaar"
 
 
+_DIM_KEYS = ("kernhelderheid", "programma_substantie",
+             "leeruitkomst_orientatie", "ondersteunende_secties")
+
+def tool_input_complete(inp: dict) -> tuple[bool, str]:
+    """Controleert of een submit_score-tool_input compleet genoeg is om te scoren.
+    Vangt truncatie op (bv. door max_tokens) vóór we in finalize_scores duiken."""
+    if not isinstance(inp, dict):
+        return False, "tool-input is geen object"
+    dims = inp.get("dimensies")
+    if not isinstance(dims, dict):
+        return False, "'dimensies' ontbreekt (waarschijnlijk afgekapt door max_tokens)"
+    for k in _DIM_KEYS:
+        d = dims.get(k)
+        if not isinstance(d, dict) or not isinstance(d.get("score"), (int, float)):
+            return False, f"dimensie '{k}' ontbreekt of heeft geen score"
+    return True, ""
+
 def finalize_scores(model_out: dict) -> dict:
     """Neemt de LLM-oordelen en berekent basisscore, impact, eindscore, verdict, cap-vlag."""
     dims = model_out["dimensies"]
@@ -248,19 +266,6 @@ SUBMIT_TOOL = {
                 },
                 "required": ["severity", "type", "samenvatting", "specifiek", "actie_voor_rewriter"],
             },
-            "sectie_dekking": {
-                "type": "object",
-                "properties": {
-                    "korte_omschrijving": {"type": "string", "enum": _COVERAGE_ENUM},
-                    "algemene_omschrijving": {"type": "string", "enum": _COVERAGE_ENUM},
-                    "programma": {"type": "string", "enum": _COVERAGE_ENUM},
-                    "doelgroep": {"type": "string", "enum": _COVERAGE_ENUM},
-                    "voorkennis": {"type": "string", "enum": _COVERAGE_ENUM},
-                    "doelen": {"type": "string", "enum": _COVERAGE_ENUM},
-                },
-                "required": ["korte_omschrijving", "algemene_omschrijving", "programma",
-                             "doelgroep", "voorkennis", "doelen"],
-            },
             "bruikbaar": {"type": "array", "items": {"type": "string"}},
             "strippen": {"type": "array", "items": {"type": "string"}},
             "gaten": {"type": "array", "items": {"type": "string"}},
@@ -280,11 +285,11 @@ SUBMIT_TOOL = {
 # 5. PROMPT  --  gecachete rubric-prefix + korte werkinstructie
 # ---------------------------------------------------------------------------
 
-def load_rubric_prefix(rubric_path: str) -> str:
-    """Leest de rubric-md en knipt §1-§8 eruit (alles vóór '## **9')."""
+def load_rubric_prefix(rubric_path: str, cut_section: int = RUBRIC_CUT) -> str:
+    """Leest de rubric-md en knipt alles vóór '## **{cut_section}' eruit."""
     with open(rubric_path, encoding="utf-8") as f:
         text = f.read()
-    cut = re.search(r"^##\s*\*\*9", text, flags=re.M)
+    cut = re.search(rf"^##\s*\*\*{cut_section}", text, flags=re.M)
     return text[:cut.start()].strip() if cut else text.strip()
 
 
@@ -299,7 +304,7 @@ Werkwijze:
    Is het aantal dagen als bekend meegegeven, gebruik dat en zet dagen_bron_herkomst=expliciet.
    Anders schat je het plausibel uit inhoud + titel en zet je dagen_bron_herkomst=geschat.
 2. Scoor de vier dimensies 0-100 met de verankerde niveaubeschrijvingen uit de rubric.
-   Programma-substantie beoordeel je RELATIEF aan het aantal dagen; straf tool-achtergrond-ballast af.
+   Programma-substantie beoordeel je RELATIEF aan het aantal dagen en het type training (bijv. foundations of beginner); straf tool-achtergrond-ballast af.
 3. Beoordeel actualiteit. Zoek zo nodig het onderwerp op (web search) om deprecatie/versie-status
    vast te stellen. Bepaal severity (none/low/medium/high) en type (none/additief/structureel).
    Additief = repareerbaar met refresh; structureel = vraagt een menselijke inhoudelijke beslissing.
@@ -380,9 +385,6 @@ class ScoreResult:
             "eindscore": c.get("eindscore"),
             "verdict": c.get("verdict", ""),
         }
-        for sec in ("korte_omschrijving", "algemene_omschrijving", "programma",
-                    "doelgroep", "voorkennis", "doelen"):
-            rec[f"dekking_{sec}"] = dek.get(sec, "")
         rec.update({
             "bruikbaar": " | ".join(m.get("bruikbaar", []) or []),
             "strippen": " | ".join(m.get("strippen", []) or []),
@@ -394,17 +396,32 @@ class ScoreResult:
         })
         return rec
 
-
 def _extract_tool_input(response) -> dict | None:
     for block in response.content:
         if getattr(block, "type", None) == "tool_use" and block.name == "submit_score":
             return block.input
     return None
 
+def _attempt(client, model, system, messages, tools, max_tokens):
+    """Eén poging: geef (tool_input, stop_reason, resp) terug. tool_input kan None zijn."""
+    for _ in range(4):  # marge voor eventuele extra tool-ronden
+        resp = client.messages.create(
+            model=model, max_tokens=max_tokens,
+            system=system, messages=messages, tools=tools,
+        )
+        tool_input = _extract_tool_input(resp)
+        if tool_input is not None:
+            return tool_input, resp.stop_reason, resp
+        if resp.stop_reason != "tool_use":
+            return None, resp.stop_reason, resp
+        # tool gebruikt zonder submit_score (onwaarschijnlijk) -> resultaat terugvoeren en doorgaan
+        messages = messages + [{"role": "assistant", "content": resp.content}]
+    return None, resp.stop_reason, resp
 
 def score_one(client, training_id, training_naam: str, source_text: str,
               known_days: int | None, rubric_prefix: str,
-              model: str = MODEL, use_web_search: bool = USE_WEB_SEARCH) -> ScoreResult:
+              model: str = MODEL, use_web_search: bool = USE_WEB_SEARCH,
+              max_tokens: int = MAX_TOKENS) -> ScoreResult:
     tools: list[dict] = [SUBMIT_TOOL]
     if use_web_search:
         tools.append({
@@ -412,32 +429,35 @@ def score_one(client, training_id, training_naam: str, source_text: str,
             "name": "web_search",
             "max_uses": WEB_SEARCH_MAX_USES,
         })
-
+ 
     system = build_system(rubric_prefix)
     messages = [{"role": "user", "content": build_user(training_naam, source_text, known_days)}]
-
+ 
     try:
-        # Server-side web search wordt binnen de response afgehandeld; wij lezen submit_score eruit.
-        for _ in range(4):  # ruime marge voor eventuele extra ronden
-            resp = client.messages.create(
-                model=model, max_tokens=MAX_TOKENS,
-                system=system, messages=messages, tools=tools,
-            )
-            tool_input = _extract_tool_input(resp)
-            if tool_input is not None:
+        budget = max_tokens
+        last_reason = None
+        for attempt_nr in range(2):  # 2e poging met dubbel budget bij afkapping/onvolledigheid
+            tool_input, stop_reason, _ = _attempt(client, model, system, messages, tools, budget)
+            last_reason = stop_reason
+            if tool_input is None:
+                if stop_reason == "max_tokens":       # afgekapt vóór de tool -> meer budget
+                    budget *= 2
+                    continue
+                break                                  # andere reden: niet zinvol te herproberen
+            complete, why = tool_input_complete(tool_input)
+            if complete:
                 computed = finalize_scores(tool_input)
                 return ScoreResult(training_id, training_naam, True,
                                    model_out=tool_input, computed=computed,
                                    source_chars=len(source_text))
-            if resp.stop_reason != "tool_use":
-                break
-            # onwaarschijnlijk pad: model gebruikte een tool zonder submit_score -> voer resultaat terug
-            messages.append({"role": "assistant", "content": resp.content})
+            # tool wél aangeroepen maar onvolledig (bv. dimensies afgekapt) -> retry met meer budget
+            budget *= 2
+            last_reason = f"onvolledige tool-output: {why} (stop_reason={stop_reason})"
         return ScoreResult(training_id, training_naam, False,
-                           error=f"Geen submit_score-tool_use ontvangen (stop_reason={resp.stop_reason}).")
+                           error=f"Geen bruikbare submit_score na 2 pogingen ({last_reason}).")
     except Exception as e:  # noqa: BLE001
         return ScoreResult(training_id, training_naam, False, error=f"{type(e).__name__}: {e}")
-
+ 
 
 def make_client():
     """Lazy import zodat de rekenkern zonder anthropic/API-key te testen is."""
