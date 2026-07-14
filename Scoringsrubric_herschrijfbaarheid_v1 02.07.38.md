@@ -74,7 +74,7 @@ Programma weegt het zwaarst omdat een auto-herschrijving staat of valt met een p
 
 ### **3.2 Programma-substantie** 
 
-*Bevatten de modules echte, beschrijfbare, niet-overlappende inhoud die een compleet programma vormt voor het aantal dagen?* Beoordeel altijd relatief **aan de duur** en **aan het type training (e.g., foundations versus professional)** uit de bron: 2 rijke modules kunnen een 2-daagse dragen (mits op te splitsen), maar niet een 5-daagse; 5 beschreven modules dekken een 1-daagse ruim; een python professional cursus kan objectgeoriënteerd programmeren bevatten, maar een korte introductie cursus waarschijnlijk niet. 
+*Bevatten de modules echte, beschrijfbare, niet-overlappende inhoud die een compleet programma vormt voor het aantal dagen , passend voor het niveau van de training?* Beoordeel altijd relatief **aan de duur** en **aan het type training (e.g., foundations versus professional)** uit de bron: 2 rijke modules kunnen een 2-daagse dragen (mits op te splitsen), maar niet een 5-daagse; 5 beschreven modules dekken een 1-daagse ruim; een python professional cursus kan objectgeoriënteerd programmeren bevatten, maar een korte introductie cursus waarschijnlijk niet. 
 
 | Score | Beschrijving |
 | ----- | ----- |

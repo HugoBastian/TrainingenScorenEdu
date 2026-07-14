@@ -36,6 +36,25 @@ python test_scoring.py
 - **`Leeruitkomst-oriëntatie`** — Verwoordt de bron wat de deelnemer met de kennis kan (uitkomsten), of is het vooral achtergrond over de tool ("wat is X, opgericht in jaar Y, hoe werkt het")?
 - **`Ondersteunende secties`** — Zijn Doelgroep, Voorkennis en Doelen aanwezig of schoon af te leiden? 
 
+## Actualiteitsmodifier
+
+Actualiteit is **geen vijfde gewogen dimensie**, maar een modifier op de basisscore plus een aparte vlag voor de herschrijf-LLM. Reden: "verouderde bron" betekent iets anders per type training, dus de impact loopt over twee assen: **severity** (hoe verouderd) × **type** (repareerbaar of blokkerend).
+
+**Twee types**
+- **Additief** — repareerbaar met een actualisatieslag (evt. met web search), opzet blijft overeind. Bijv. Google Ads mist PMax/GA4/RSA, CRM multichannel→omnichannel.
+- **Structureel** — ondergraaft het paradigma of de opzet zelf; vraagt een inhoudelijke beslissing die het model niet uit de bron kan halen. Auto-herschrijven levert dan een zelfverzekerd-foute of holle pagina. Bijv. React pre-Hooks, XSL leunend op uitgefaseerde browser-XSLT-processor.
+
+**Score-impact** (afgetrokken van de basisscore)
+
+| Severity | Additief | Structureel |
+|---|---|---|
+| none | 0 | — |
+| low | −1 tot −3 | −8 tot −12 |
+| medium | −5 tot −8 | −15 tot −25 |
+| high | −10 tot −15 | −25 tot −40 |
+
+Bij structureel geldt, ongeacht severity: `menselijke_input_nodig = true` en de eindscore wordt gecapt op ≤ 40 — een structurele breuk gaat altijd langs een mens vóór automatisch herschrijven.
+
 ## Tuneable
 
 Alle knoppen staan bovenaan `score_trainings.py`:
