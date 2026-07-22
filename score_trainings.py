@@ -261,8 +261,14 @@ SUBMIT_TOOL = {
                     "type": {"type": "string", "enum": ["none", "additief", "structureel"]},
                     "samenvatting": {"type": "string"},
                     "specifiek": {"type": "array", "items": {"type": "string"}},
-                    "actie_voor_rewriter": {"type": "string",
-                                            "description": "additief -> 'refresh: ...'; structureel -> 'BESLISSING NODIG: ...'"},
+                    "actie_voor_rewriter": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Losse, atomaire actiepunten (één aanpassing per item, geen "
+                                       "samengestelde 'en ook'-punten) -- worden genummerd getoond zodat "
+                                       "een reviewer per nummer kan besluiten wat de herschrijver meekrijgt. "
+                                       "additief -> 'refresh: ...'; structureel -> 'BESLISSING NODIG: ...'",
+                    },
                 },
                 "required": ["severity", "type", "samenvatting", "specifiek", "actie_voor_rewriter"],
             },
@@ -308,6 +314,10 @@ Werkwijze:
 3. Beoordeel actualiteit. Zoek zo nodig het onderwerp op (web search) om deprecatie/versie-status
    vast te stellen. Bepaal severity (none/low/medium/high) en type (none/additief/structureel).
    Additief = repareerbaar met refresh; structureel = vraagt een menselijke inhoudelijke beslissing.
+   Zet `actie_voor_rewriter` als een LIJST van losse, atomaire actiepunten (één concrete aanpassing
+   per item, geen samengevoegde "en ook"-punten). Deze lijst wordt genummerd getoond aan een
+   menselijke reviewer, die per nummer besluit wat de herschrijf-agent uiteindelijk meekrijgt --
+   houd items daarom kort en op zichzelf staand.
 4. Schrijf VOORUITGERICHTE feedback voor de herschrijver (bruikbaar / strippen / gaten /
    rewrite_guidance) en de sectie-dekkingslabels.
 
@@ -362,6 +372,10 @@ class ScoreResult:
                 d = (d or {}).get(k, {}) if isinstance(d, dict) else {}
             return d
 
+        acties = act.get("actie_voor_rewriter", []) or []
+        acties_genummerd = "\n".join(f"{i}. {a}" for i, a in enumerate(acties, start=1))
+        besluit_default = ",".join(str(i) for i in range(1, len(acties) + 1))
+
         rec = {
             "training_id": self.training_id,
             "titel": self.titel,
@@ -381,7 +395,8 @@ class ScoreResult:
             "actualiteit_impact": c.get("actualiteit_impact"),
             "actualiteit_samenvatting": act.get("samenvatting", ""),
             "actualiteit_specifiek": " | ".join(act.get("specifiek", []) or []),
-            "actualiteit_actie": act.get("actie_voor_rewriter", ""),
+            "actualiteit_actie": acties_genummerd,
+            "actie_besluit": besluit_default,
             "eindscore": c.get("eindscore"),
             "verdict": c.get("verdict", ""),
         }

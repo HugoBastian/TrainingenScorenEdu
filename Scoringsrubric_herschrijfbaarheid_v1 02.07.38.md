@@ -129,7 +129,9 @@ Actualiteit is géén vijfde gewogen dimensie, maar een **modifier** op de basis
 
 ### **4.3 De vlag zelf**
 
-Ongeacht de score-impact levert de scorer altijd een gestructureerde actualiteitsvlag op met: `severity`, `type`, een korte samenvatting, een lijst concrete verouderde punten, en een **actie voor de rewriter** — bij additief een "refresh: …"-instructie, bij structureel een "BESLISSING NODIG: …"-instructie. Zo weet de herschrijf-LLM (of de mens) precies welke actualisatieslag nodig is.
+Ongeacht de score-impact levert de scorer altijd een gestructureerde actualiteitsvlag op met: `severity`, `type`, een korte samenvatting, een lijst concrete verouderde punten, en een **lijst acties voor de rewriter** (`actie_voor_rewriter`) — losse, atomaire punten (één concrete aanpassing per item), bij additief in de trant van "refresh: …", bij structureel "BESLISSING NODIG: …". Zo weet de herschrijf-LLM (of de mens) precies welke actualisatieslag nodig is.
+
+**Reviewstap vóór het herschrijven.** De lijst `actie_voor_rewriter` wordt genummerd in de outputsheet gezet (kolom `actualiteit_actie`), met daarnaast een kolom `actie_besluit` die standaard is voorgevuld met alle nummers (bv. `1,2,3`). Een expert controleert per training of de acties klopt en relevant zijn, en past `actie_besluit` aan: nummers verwijderen die niet nodig zijn, of een nummer aanvullen met een voorwaarde (bv. `1, 3: alleen als klant nog X gebruikt`). Deze kolom is vrije tekst — er wordt niets automatisch geparsed — en gaat samen met de genummerde acties mee als input voor de herschrijf-agent.
 
 **Actualiteit vereist actuele wereldkennis.** De scorer kan niet uit de bron alleen bepalen of iets is uitgefaseerd. De scoring-agent draait daarom met web search aan, en zoekt het onderwerp op deprecatie/versie-status vóór hij de vlag zet (zie de "Actualiseren"-stap in de style guide). Wanneer web search niet aanstaat, gebruik de interne kennis van het LLM. Wees kritisch of het LLM daadwerkelijk over de benodigde kennis beschikt.
 
@@ -161,7 +163,7 @@ De scoring-agent geeft per training exact dit terug. De velden `score`/`feedback
     "score\_impact": 0,  
     "samenvatting": "",  
     "specifiek": \[\],  
-    "actie\_voor\_rewriter": "refresh: … | BESLISSING NODIG: …"  
+    "actie\_voor\_rewriter": \["refresh: … | BESLISSING NODIG: …"\]  
   },
 
   "eindscore": 0,  
